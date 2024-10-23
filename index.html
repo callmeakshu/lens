@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Object Scanner</title>
+    <style>
+        /* General styles */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+
+        h1 {
+            margin-top: 0;
+            padding-top: 20px;
+            font-size: 2.5em;
+            color: #333;
+        }
+
+        nav {
+            background-color: #222;
+            padding: 15px;
+        }
+
+        nav ul {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        nav ul li {
+            margin-right: 20px;
+        }
+
+        nav ul li:last-child {
+            margin-right: 0;
+        }
+
+        nav ul li a {
+            color: white;
+            text-decoration: none;
+            font-size: 1.2em;
+            transition: color 0.3s;
+        }
+
+        nav ul li a:hover {
+            color: #ffcc00;
+        }
+
+        /* Scanner container */
+        .scanner {
+            margin-top: 50px;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.1);
+            display: inline-block;
+            border-radius: 10px;
+            max-width: 700px;
+            width: 90%;
+        }
+
+        video {
+            width: 100%;
+            border-radius: 10px;
+        }
+
+        button {
+            margin-top: 15px;
+            padding: 12px 25px;
+            background-color: #ffcc00;
+            color: #222;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #e6b800;
+        }
+
+        .result {
+            margin-top: 30px;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #555;
+        }
+
+        .result.success {
+            color: #28a745;
+        }
+
+        .result.error {
+            color: #dc3545;
+        }
+
+        footer {
+            margin-top: 50px;
+            padding: 20px;
+            background-color: #222;
+            color: white;
+            font-size: 0.9em;
+        }
+
+        /* Loading animation */
+        .loading {
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .loading .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            background-color: #ffcc00;
+            margin-right: 5px;
+            animation: bounce 0.6s infinite alternate;
+        }
+
+        .loading .dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .loading .dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes bounce {
+            to {
+                transform: translateY(-5px);
+            }
+        }
+    </style>
+    <!-- TensorFlow.js and Coco SSD -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+</head>
+<body>
+
+
+
+    <h1>AK Lens</h1>
+
+    <!-- Scanner section -->
+    <div class="scanner" id="scannerContainer">
+           <!-- Header and Navigation menu -->
+    <nav>
+        <ul>
+            <li><a href="#" id="scanAnything">Click here to Scan Anything</a></li>
+        </ul>
+    </nav>
+        <video id="videoElement" autoplay></video>
+        <button id="captureButton">Capture</button>
+        <canvas id="canvasElement" style="display: none;"></canvas>
+    </div>
+
+    <!-- Display scanned result -->
+    <div class="result" id="resultText">Scanned result will appear here.</div>
+
+    <!-- Loading animation -->
+    <div class="loading" id="loadingDots" style="display: none;">
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        &copy; 2024 AI Object Scanner | All rights reserved.
+    </footer>
+
+    <script>
+        let model;
+        (async function() {
+            model = await cocoSsd.load();  // Load the pre-trained Coco SSD model
+            console.log("Model loaded successfully.");
+        })();
+
+        // Elements from the HTML
+        const scanAnything = document.getElementById('scanAnything');
+        const videoElement = document.getElementById('videoElement');
+        const captureButton = document.getElementById('captureButton');
+        const canvasElement = document.getElementById('canvasElement');
+        const resultText = document.getElementById('resultText');
+        const loadingDots = document.getElementById('loadingDots');
+
+        // Function to open the camera
+        scanAnything.addEventListener('click', function() {
+            // Request the camera video stream
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then((stream) => {
+                    videoElement.srcObject = stream;
+                })
+                .catch((err) => {
+                    console.error("Error accessing the camera: ", err);
+                });
+        });
+
+        // Capture image and run TensorFlow.js model when the button is clicked
+        captureButton.addEventListener('click', async function() {
+            // Show loading animation
+            loadingDots.style.display = 'inline-block';
+            resultText.textContent = '';
+            resultText.classList.remove('success', 'error');
+
+            // Draw the current frame from the video onto the canvas
+            const context = canvasElement.getContext('2d');
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+            context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+
+            // Use TensorFlow.js model to detect objects
+            const predictions = await model.detect(canvasElement);
+
+            // Hide loading animation
+            loadingDots.style.display = 'none';
+
+            // Clear the canvas for each capture
+            context.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            
+            if (predictions.length > 0) {
+                resultText.textContent = "Detected objects: " + predictions.map(p => p.class).join(', ');
+                resultText.classList.add('success');
+
+                // Loop through predictions and display each result
+                predictions.forEach(prediction => {
+                    const [x, y, width, height] = prediction.bbox;
+                    context.strokeStyle = "green";
+                    context.lineWidth = 2;
+                    context.strokeRect(x, y, width, height);
+
+                    context.fillStyle = "green";
+                    context.font = "18px Arial";
+                    context.fillText(
+                        `${prediction.class} (${(prediction.score * 100).toFixed(2)}%)`,
+                        x,
+                        y > 10 ? y - 5 : 10
+                    );
+                });
+            } else {
+                resultText.textContent = "No objects detected.";
+                resultText.classList.add('error');
+            }
+        });
+    </script>
+</body>
+</html>
