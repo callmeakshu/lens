@@ -36,11 +36,11 @@
         }
 
         nav ul li {
-            margin-right: 20px;
+            margin-right: 50px;
         }
 
         nav ul li:last-child {
-            margin-right: 0;
+            margin-right: 100;
         }
 
         nav ul li a {
@@ -64,6 +64,7 @@
             border-radius: 10px;
             max-width: 700px;
             width: 90%;
+            position: relative; /* Added for absolute positioning of rotate button */
         }
 
         video {
@@ -72,7 +73,7 @@
         }
 
         button {
-            margin-top: 15px;
+            margin-top: 100px;
             padding: 12px 25px;
             background-color: #ffcc00;
             color: #222;
@@ -122,7 +123,7 @@
             border-radius: 50%;
             display: inline-block;
             background-color: #ffcc00;
-            margin-right: 5px;
+            margin-right: 50px;
             animation: bounce 0.6s infinite alternate;
         }
 
@@ -139,6 +140,38 @@
                 transform: translateY(-5px);
             }
         }
+
+        /* Rotate camera button */
+        .rotate-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: #ffcc00;
+            color: #222;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            font-size: 1.5em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.3s;
+        }
+
+        .rotate-button:hover {
+            background-color: #e6b800;
+        }
+
+        /* Title for camera rotation */
+        .rotate-title {
+            position: absolute;
+            top: 80px; /* Adjust this as necessary */
+            right: 30px; /* Align it with the rotate button */
+            font-size: 0.8em;
+            color: #555;
+        }
     </style>
     <!-- TensorFlow.js and Coco SSD -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
@@ -146,21 +179,21 @@
 </head>
 <body>
 
-
-
     <h1>AK Lens</h1>
 
     <!-- Scanner section -->
     <div class="scanner" id="scannerContainer">
-           <!-- Header and Navigation menu -->
-    <nav>
-        <ul>
-            <li><a href="#" id="scanAnything">Click here to Scan Anything</a></li>
-        </ul>
-    </nav>
+        <!-- Header and Navigation menu -->
+        <nav>
+            <ul>
+                <li><a href="#" id="scanAnything">Click here to Scan Anything</a></li>
+            </ul>
+        </nav>
         <video id="videoElement" autoplay></video>
         <button id="captureButton">Capture</button>
         <canvas id="canvasElement" style="display: none;"></canvas>
+        <button class="rotate-button" id="rotateButton">&#x21bb;</button> <!-- Rotate symbol -->
+        <div class="rotate-title" style="font-size: large;">Camera Rotate</div> <!-- Title for camera rotation -->
     </div>
 
     <!-- Display scanned result -->
@@ -180,6 +213,9 @@
 
     <script>
         let model;
+        let currentStream;
+        let isBackCamera = false;
+
         (async function() {
             model = await cocoSsd.load();  // Load the pre-trained Coco SSD model
             console.log("Model loaded successfully.");
@@ -192,18 +228,39 @@
         const canvasElement = document.getElementById('canvasElement');
         const resultText = document.getElementById('resultText');
         const loadingDots = document.getElementById('loadingDots');
+        const rotateButton = document.getElementById('rotateButton');
 
         // Function to open the camera
         scanAnything.addEventListener('click', function() {
-            // Request the camera video stream
-            navigator.mediaDevices.getUserMedia({ video: true })
+            startCamera(isBackCamera);
+        });
+
+        // Function to switch between front and back camera
+        rotateButton.addEventListener('click', function() {
+            isBackCamera = !isBackCamera; // Toggle camera
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop()); // Stop current stream
+            }
+            startCamera(isBackCamera);
+        });
+
+        // Start the camera stream based on the selected camera
+        function startCamera(useBackCamera) {
+            const constraints = {
+                video: {
+                    facingMode: useBackCamera ? "environment" : "user" // Switch between front and back camera
+                }
+            };
+
+            navigator.mediaDevices.getUserMedia(constraints)
                 .then((stream) => {
+                    currentStream = stream; // Store the current stream
                     videoElement.srcObject = stream;
                 })
                 .catch((err) => {
                     console.error("Error accessing the camera: ", err);
                 });
-        });
+        }
 
         // Capture image and run TensorFlow.js model when the button is clicked
         captureButton.addEventListener('click', async function() {
